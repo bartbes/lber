@@ -72,4 +72,10 @@ else
 	end
 end
 
+function bit.addOctetBE(value, octet)
+	return bit.bor(
+		bit.lshift(value, 8),
+		octet)
+end
+
 return bit

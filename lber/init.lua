@@ -142,9 +142,7 @@ function lber.parseLengthDefiniteLong(handle)
 
 	local result = 0
 	for _ = 1, numOctets do
-		result = bit.bor(
-			bit.lshift(result, 8),
-			lber.handle.readByte(handle))
+		result = bit.addOctetBE(result, lber.handle.readByte(handle))
 	end
 
 	return result
@@ -155,13 +153,14 @@ function lber.parseLengthIndefinite(_)
 end
 
 function lber.parseTLV(handle, mode)
-	mode = mode or 'ber'
 	local tlv = {}
+	tlv.mode = mode or 'ber'
 
 	tlv.type = lber.parseType(handle)
-	tlv.length = lber.parseLength(handle, mode)
+	tlv.length = lber.parseLength(handle, tlv.mode)
 
 	assert(tlv.length ~= "indefinite", "NYI")
+	-- TODO: If not using indefinite encoding, error on EOF
 
 	tlv.value = lber.handle.read(handle, tlv.length)
 

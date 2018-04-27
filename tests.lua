@@ -45,4 +45,18 @@ describe("The bit module", function()
 					2218),
 				1),
 			8283))
+
+	it("has a big-endian helper", function()
+		assert.are.equal(0xDE,
+			bit.addOctetBE(0x00, 0xDE))
+
+		assert.are.equal(0xDEAD,
+			bit.addOctetBE(0xDE, 0xAD))
+
+		assert.are.equal(0xDEADBE,
+			bit.addOctetBE(0xDEAD, 0xBE))
+
+		assert.are.equal(0xDEADBEEF,
+			bit.addOctetBE(0xDEADBE, 0xEF))
+	end)
 end)
