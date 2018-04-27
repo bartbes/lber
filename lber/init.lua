@@ -42,11 +42,11 @@ local universalTypes =
 	[0x17] = { name = "UTCTime" },
 	[0x18] = { name = "GeneralizedTime" },
 	[0x19] = { name = "GraphicString" },
-	[0x1a] = { name = "VisibleString" },
-	[0x1b] = { name = "GeneralString" },
-	[0x1c] = { name = "UniversalString" },
-	[0x1d] = { name = "CHARACTER STRING", der = { forcePrimitive = true } },
-	[0x1e] = { name = "BMPString" },
+	[0x1A] = { name = "VisibleString" },
+	[0x1B] = { name = "GeneralString" },
+	[0x1C] = { name = "UniversalString" },
+	[0x1D] = { name = "CHARACTER STRING", der = { forcePrimitive = true } },
+	[0x1E] = { name = "BMPString" },
 }
 
 local function hasLimitation(type, mode, limitation)
