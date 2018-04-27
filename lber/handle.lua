@@ -35,7 +35,7 @@ function lber_handle.peekByte(handle)
 end
 
 function lber_handle.isEof(handle)
-	return handle.pos >= #handle.str
+	return handle.pos > #handle.str
 end
 
 return lber_handle
