@@ -159,6 +159,14 @@ function lber.parseLengthIndefinite(_)
 	return "indefinite" -- TODO: Try to find the length? Defer this to later?
 end
 
+local function twosComplement(value, n)
+	if bit.rshift(value, n-1) == 1 then
+		return 2^n - value
+	else
+		return value
+	end
+end
+
 universalTypes["BOOLEAN"].decode = function(tlv)
 	assert(tlv.length == 1, "Invalid BOOLEAN encoding")
 
@@ -172,11 +180,10 @@ end
 universalTypes["INTEGER"].decode = function(tlv)
 	-- TODO: bignum?
 	local value = 0
-	for i = 1, #tlv.value do
+	for i = 1, tlv.length do
 		value = bit.addOctetBE(value, string.byte(tlv.value, i))
 	end
-	-- TODO two's complement
-	tlv.decoded = value
+	tlv.decoded = twosComplement(value, tlv.length * 8)
 end
 universalTypes["ENUMERATED"].decode = universalTypes["INTEGER"].decode
 
@@ -225,7 +232,7 @@ universalTypes["REAL"].decode = function(tlv)
 			assert(first9 ~= 0 and first9 ~= first9Mask, "Invalid exponent for REAL")
 		end
 
-		-- TODO: two's complement
+		exponent = twosComplement(exponent, exponentOctets * 8)
 
 		local number = 0
 		while not lber.handle.isEof() do
