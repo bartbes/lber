@@ -212,7 +212,19 @@ universalTypes["REAL"].decode = function(tlv)
 		for _ = 1, exponentOctets do
 			exponent = bit.addOctetBE(exponent, lber.handle.readByte(handle))
 		end
-		-- TODO: Verify exponent
+
+		if tlv.mode == 'der' or tlv.mode == 'cer' then
+			assert(base == 2, "Invalid base for REAL")
+			assert(exponent == 0 or exponent % 2 == 1, "Invalid exponent for REAL")
+		end
+
+		if exponentFormat == 0x03 then
+			local first9Mask = bit.lshift(0x1FF,
+				(exponentOctets - 1) * 8)
+			local first9 = bit.band(exponent, first9Mask)
+			assert(first9 ~= 0 and first9 ~= first9Mask, "Invalid exponent for REAL")
+		end
+
 		-- TODO: two's complement
 
 		local number = 0
@@ -252,6 +264,12 @@ universalTypes["BIT STRING"].decode = function(rootTLV)
 			while not lber.handle.isEof(handle) do
 				value = bit.addOctetBE(value, lber.handle.readByte(handle))
 				bits = bits + 8
+			end
+
+			if tlv.mode == 'der' or tlv.mode == 'cer' then
+				local unusedMask = bit.lshift(1, unused) - 1
+				local unusedBits = bit.band(value, unusedMask)
+				assert(unusedBits == 0, "Invalid trailing bits in BIT STRING encoding")
 			end
 
 			return bit.rshift(value, unused), bits - unused
@@ -305,20 +323,34 @@ universalTypes["NULL"].decode = function(tlv)
 	assert(tlv.length == 0, "Invalid NULL encoding")
 end
 
-universalTypes["SEQUENCE"].decode = function(tlv)
+local function decodeContainer(tlv, mustBeSorted)
 	local handle = lber.handle.fromString(tlv.value)
 	local parts = {}
 
+	local previousBytes, previousPos = "", handle.pos
+
 	while not lber.handle.isEof(handle) do
 		local subTLV = lber.parseTLV(handle, tlv.mode)
+
+		if mustBeSorted and tlv.mode == 'der' or tlv.mode == 'cer' then
+			local bytes = string.sub(tlv.value, previousPos, handle.pos)
+			assert(bytes > previousBytes, "Unsorted SET encoding")
+			previousBytes, previousPos = bytes, handle.pos
+		end
+
 		lber.tryDecode(subTLV)
 		table.insert(parts, subTLV)
 	end
 
 	tlv.decoded = parts
 end
--- TODO: DER required sorting
-universalTypes["SET"].decode = universalTypes["SEQUENCE"].decode
+
+universalTypes["SEQUENCE"].decode = function(tlv)
+	return decodeContainer(tlv, false)
+end
+universalTypes["SET"].decode = function(tlv)
+	return decodeContainer(tlv, true)
+end
 
 universalTypes["OBJECT IDENTIFIER"].decode = function(tlv)
 	universalTypes["RELATIVE-OID"].decode(tlv)
@@ -389,14 +421,31 @@ universalTypes["PrintableString"].decode = function(tlv)
 	tlv.decoded = decodeString(tlv)
 end
 
-local function decodeTime(tlv)
+local function decodeTime(tlv, yearChars)
 	local str = decodeString(tlv)
 	-- TODO: ensure utf8
+
+	if tlv.mode == 'der' or tlv.mode == 'cer' then
+		local year = ("%d"):rep(yearChars)
+		local MM, DD, HH, mm, ss, rem = tlv.value:match("^" .. year .. "(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)(.*)Z$")
+		assert(MM, "Incomplete TIME encoding")
+		MM, DD, HH, mm, ss = tonumber(MM), tonumber(DD), tonumber(HH), tonumber(mm), tonumber(ss)
+		assert(MM >= 1 and MM <= 12, "Invalid month in TIME encoding")
+		assert(DD >= 1 and DD <= 31, "Invalid day in TIME encoding") -- TODO: Check if day is in month?
+		assert(HH >= 0 and HH < 24, "Invalid hour in TIME encoding")
+		assert(mm >= 0 and mm < 60, "Invalid minute in TIME encoding")
+		assert(ss >= 0 and ss <= 60, "Invalid second in TIME encoding")
+		assert(ss < 60 or mm == 23, "Invalid second in TIME encoding") -- TODO: Are leap seconds supported?
+		if rem ~= "" then
+			assert(rem:match("^%.%d*[1-9]$"), "Invalid fractional seconds in TIME encoding")
+		end
+	end
+
 	return str
 end
 
 universalTypes["UTCTime"].decode = function(tlv)
-	tlv.decoded = decodeTime(tlv)
+	tlv.decoded = decodeTime(tlv, 2)
 end
 
 function lber.tryDecode(tlv)
